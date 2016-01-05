@@ -148,6 +148,8 @@ void s_run(unsigned int port) {
         return;
     }
 
+    // So that we dont have to wait for around 1min for OS
+    // to recycle the socket
     if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (char *)&flag,
                     sizeof(int)) == -1) { 
         perror("setsockopt"); 
@@ -162,6 +164,10 @@ void s_run(unsigned int port) {
         return;
     }
 
+    // We want the send packet size to be no more than
+    // what we specify in send() call so set NODELAY flag.
+    // The size requirement is because we are trying to
+    // measure througput for a particular packet size
     if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag,
                          sizeof(int)) == -1) {
         printf("Cannot disable Nagle! Exit\n");
@@ -199,6 +205,8 @@ int main(int argc, char **argv) {
     int ch;
     unsigned long int port = DEFAULT_PORT;
 
+    // make provision to specify the port in case
+    // DEFAULT_PORT(9000) does not work
     while ((ch = getopt(argc, argv, "p:")) != -1) {
         switch (ch) {
             case 'p':
@@ -214,7 +222,7 @@ int main(int argc, char **argv) {
         }
     }
 
-    printf("port is %lu\n", port);
+    printf("Operating on port %lu\n", port);
     s_run(port);
 
     return 0;

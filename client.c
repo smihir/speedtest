@@ -176,16 +176,17 @@ void c_run(char *hostname, char *port) {
     for (p = res; p != NULL; p = p->ai_next) {
         void *addr;
 
-        if (p->ai_family == AF_INET) { // IPv4
+        if (p->ai_family == AF_INET) {
             struct sockaddr_in *ipv4 = (struct sockaddr_in *) p->ai_addr;
             addr = &(ipv4->sin_addr);
-        } else { // IPv6
+        } else {
+            // Sorry, no IPV6
             continue;
         }
 
         // convert the IP to a string and print it:
         inet_ntop(p->ai_family, addr, ipstr, sizeof ipstr);
-        printf("%s\n", ipstr);
+        printf("Will connect to: %s\n", ipstr);
         break;
     }
 
@@ -207,6 +208,8 @@ void c_run(char *hostname, char *port) {
         return;
     }
 
+    // Server is listening for the control messages in the main loop,
+    // send a message to start DOWNLINK test
     if (send_ctrl_msg(socketfd, T_DOWNLOAD_TEST, NULL, 0)) {
         printf("Server is Ready for Download Test...\n");
         char *s = run_rx_test(socketfd, 1);
@@ -221,6 +224,8 @@ void c_run(char *hostname, char *port) {
         printf("Internal Error! Will not run Download Test\n");
     }
 
+    // Server is listening for the control messages, send
+    // a message to start UPLINK test
     if (send_ctrl_msg(socketfd, T_UPLOAD_TEST, NULL, 0)) {
         printf("Server is Ready for Upload Test...\n");
         run_tx_test(socketfd);
