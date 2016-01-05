@@ -3,10 +3,10 @@ project(sppedtest)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c99")
 
 set(SERVER_SOURCE_FILES
-    server.c)
+    server.c packet.h)
 
 set(CLIENT_SOURCE_FILES
-    client.c)
+    client.c packet.h)
 
 add_executable(server ${SERVER_SOURCE_FILES})
 add_executable(client ${CLIENT_SOURCE_FILES})
