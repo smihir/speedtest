@@ -3,14 +3,60 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <netinet/in.h>
 #include "packet.h"
 
-#define MAXPKTS 10000
+#define MAXPKTS 1000
+#define BYTESTOMB 1024 * 1024
+#define MAX_PRINT_LEN 200
 
-void run_rx_test(int confd) {
-    struct timeval tv;
-    int total_len = 0;
+double elapsed_time(struct timeval *tv_first, struct timeval *tv_end)
+{
+    double elapsed_msec;
+
+    elapsed_msec = (tv_end->tv_sec - tv_first->tv_sec) * 1000;
+    elapsed_msec += (tv_end->tv_usec - tv_first->tv_usec) / 1000;
+
+    return elapsed_msec;
+}
+
+char *print_summarystats(struct timeval *tv_first, struct timeval *tv_end,
+        unsigned int numpkts_rx, unsigned int numbytes_rx, int retstr)
+{
+    double elapsed_msec;
+    float MBps;
+    char *s = NULL;
+
+    if (retstr)
+        s = malloc(MAX_PRINT_LEN);
+
+    elapsed_msec = elapsed_time(tv_first, tv_end);
+    MBps = numbytes_rx / ((elapsed_msec / 1000) * BYTESTOMB);
+
+    printf("\n---------------------------------------------\n");
+    if (s != NULL) {
+        snprintf(s, MAX_PRINT_LEN, "packets received: %u \nbytes_received: %u \n"
+                "average packets per second: %f \naverage Mega Bytes per second: %f (%f Mbps)\n"
+                "duration (ms): %f \n",
+                numpkts_rx, numbytes_rx, numpkts_rx / (elapsed_msec / 1000),
+                MBps, MBps * 8, elapsed_msec);
+        printf("%s", s);
+
+    } else {
+        printf("packets received: %u \nbytes_received: %u \n"
+               "average packets per second: %f \naverage Mega Bytes per second: %f (%f Mbps)\n"
+               "duration (ms): %f \n",
+               numpkts_rx, numbytes_rx, numpkts_rx / (elapsed_msec / 1000),
+               MBps, MBps * 8, elapsed_msec);
+    }
+    printf("---------------------------------------------\n");
+    return s;
+}
+
+char *run_rx_test(int confd, int retstr) {
+    struct timeval tv, tv1, tv_first;
+    unsigned int total_len = 0, num_pkts = 0;
     char *buf = malloc(RX_BUFSIZE);
 
     if (buf == NULL) {
@@ -24,39 +70,40 @@ void run_rx_test(int confd) {
         perror("Error");
     }
 
-    printf("rx_test\n");
+    printf("Running RX Test\n");
     while (1) {
         int len;
         struct packet_header *hdr;
 
         len = recv(confd, buf, RX_BUFSIZE, 0);
         if (len == -1) {
-            if (errno == EAGAIN) {
-                free(buf);
+            if (errno == EBADF) {
+                perror("Error Receiving Packet Closing socket!");
                 close(confd);
-                return;
+                break;
             }
             perror("Error Receiving Packet");
-            continue;
+            break;
         } else if (len == 0) {
             printf("Connection Closed\n");
-            continue;
-            printf("Connection Closed\n");
-            free(buf);
             close(confd);
-            return;
+            break;
         }
 
         total_len += len;
+        num_pkts++;
+        gettimeofday(&tv1, NULL);
+        if (num_pkts == 1) {
+            tv_first = tv1;
+        }
+
         hdr = (struct packet_header *)buf;
         
-        printf(".");
         if (hdr->type == T_END) {
-            printf("Done\n");
             break;
         }
     }
-    printf("total_len %d\n", total_len);
+    return print_summarystats(&tv_first, &tv1, num_pkts, total_len, retstr);
 
     free(buf);
 }
@@ -68,7 +115,7 @@ void run_tx_test(int confd) {
     struct packet_header *hdr;
     int total_len = 0;
 
-    printf("tx_test\n");
+    printf("Running TX Test\n");
     buffer = (char *) malloc(sizeof(char) * sz);
     if (buffer == NULL) {
         printf("Memory allocation failed\n");
@@ -84,7 +131,6 @@ void run_tx_test(int confd) {
             hdr->type = T_END;
         }
 
-        //printf(".");
         if ((len = send(confd, buffer, TX_BUFSIZE, 0)) == -1) {
             if (errno == EBADF) {
                 free(buffer);
@@ -92,10 +138,7 @@ void run_tx_test(int confd) {
                 return;
             }
             perror("send");
-            printf("%u\n", errno);
         }
         total_len += len;
     }
-    printf("total_len %d\n", total_len);
 }
-
