@@ -173,22 +173,24 @@ void s_run(unsigned int port) {
         return;
     }
 
-    struct sockaddr_storage their;
-    socklen_t sz = sizeof(their);
-    int confd = accept(fd, (struct sockaddr *)&their, &sz);
+    while (1) {
+        struct sockaddr_storage their;
+        socklen_t sz = sizeof(their);
+        int confd = accept(fd, (struct sockaddr *)&their, &sz);
 
-    if (confd == -1) {
-        perror("cannot accept connection");
-        return;
+        if (confd == -1) {
+            perror("cannot accept connection");
+            return;
+        }
+
+        if (setsockopt(confd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag,
+                            sizeof(int)) == -1) {
+            printf("Cannot disable Nagle! Exit\n");
+            exit(1);
+        }
+
+        process_ctr_msg(confd);
     }
-
-    if (setsockopt(confd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag,
-                         sizeof(int)) == -1) {
-        printf("Cannot disable Nagle! Exit\n");
-        exit(1);
-    }
-
-    process_ctr_msg(confd);
 
     close(fd);
 }
