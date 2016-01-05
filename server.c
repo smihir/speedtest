@@ -13,7 +13,7 @@
 
 #define DEFAULT_PORT 9000
 #define BACKLOG 50
-#define MAX_THREADS 2
+#define MAX_THREADS 8
 
 pthread_mutex_t lock;
 pthread_cond_t fill, empty;
@@ -235,6 +235,8 @@ void s_run(unsigned int port) {
 
     }
 
+	for(i = 0; i < MAX_THREADS; i++)
+		pthread_join(server_thread[i], NULL);
     close(fd);
 }
 
