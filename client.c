@@ -7,83 +7,11 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 #include "packet.h"
-
-#define MAXPKTS 10000
+#include "common.h"
 
 void c_usage() {
     printf("client --server-ip <ip address of server> --server-port <port of the server>\n");
     exit(1);
-}
-
-void c_run_rx_test(int sockfd) {
-    struct timeval tv;
-    char *buf = malloc(RX_BUFSIZE);
-
-    if (buf == NULL) {
-        printf("Cannot allocate memory for Rx\n");
-        exit(1);
-    }
-
-    tv.tv_sec = 5;
-    tv.tv_usec = 0;
-    if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
-        perror("Error");
-    }
-
-    printf("rx_test\n");
-    while (1) {
-        int len;
-        struct packet_header *hdr;
-
-        len = recv(sockfd, buf, RX_BUFSIZE, 0);
-        if (len == -1) {
-            if (errno == EAGAIN) {
-                free(buf);
-                close(sockfd);
-                return;
-            }
-            perror("Error Receiving Packet");
-            continue;
-        }
-
-        printf(".");
-        hdr = (struct packet_header *)buf;
-        
-        if (hdr->type == T_END) {
-            printf("Done\n");
-            break;
-        }
-    }
-    printf("\n");
-}
-
-void c_run_tx_test(int sockfd) {
-    char *buffer;
-    int sz = TX_BUFSIZE;
-    int numpkts = MAXPKTS;
-    struct packet_header *hdr;
-
-    printf("tx_test\n");
-    buffer = (char *) malloc(sizeof(char) * sz);
-    if (buffer == NULL) {
-        printf("Memory allocation failed\n");
-        exit(1);
-    }
-
-    hdr = (struct packet_header *)buffer;
-    hdr->type = T_DATA;
-
-    while (numpkts--) {
-        if (numpkts == 0) {
-            hdr->type = T_END;
-        }
-        printf(".");
-        if (send(sockfd, buffer, TX_BUFSIZE, 0) == -1) {
-            perror("send");
-            printf("%u\n", errno);
-        }
-    }
-    printf("\n");
 }
 
 void c_run(char *hostname, char *port) {
@@ -127,8 +55,8 @@ void c_run(char *hostname, char *port) {
         return;
     }
 
-    c_run_tx_test(socketfd);
-    c_run_rx_test(socketfd);
+    //run_tx_test(socketfd);
+    run_rx_test(socketfd);
 }
 
 int main(int argc, char **argv) {
