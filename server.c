@@ -94,6 +94,7 @@ void process_ctr_msg(int confd) {
         len = recv(confd, buf, RX_BUFSIZE, 0);
         if (len == -1) {
             if (errno == EAGAIN) {
+                printf("Timed out waiting for commands from client\n");
                 close(confd);
                 break;
             }
@@ -141,6 +142,12 @@ void s_run(unsigned int port) {
         return;
     }
 
+    if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (char *)&flag,
+                    sizeof(int)) == -1) { 
+        perror("setsockopt"); 
+        exit(1); 
+    } 
+
     my.sin_addr.s_addr = INADDR_ANY;
     my.sin_family = AF_INET;
     my.sin_port = htons(port);
@@ -149,9 +156,8 @@ void s_run(unsigned int port) {
         return;
     }
 
-    int res = setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag,
-                         sizeof(int));
-    if (res < 0) {
+    if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag,
+                         sizeof(int)) == -1) {
         printf("Cannot disable Nagle! Exit\n");
         exit(1);
     }
@@ -170,14 +176,15 @@ void s_run(unsigned int port) {
         return;
     }
 
-    res = setsockopt(confd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag,
-                         sizeof(int));
-    if (res < 0) {
+    if (setsockopt(confd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag,
+                         sizeof(int)) == -1) {
         printf("Cannot disable Nagle! Exit\n");
         exit(1);
     }
 
     process_ctr_msg(confd);
+
+    close(fd);
 }
 
 int main(int argc, char **argv) {
