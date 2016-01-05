@@ -1,7 +1,7 @@
 #ifndef SPPEDTEST_PACKET_H
 #define SPPEDTEST_PACKET_H
 
-#define RX_BUFSIZE 10 * 1024
+#define RX_BUFSIZE 1024
 #define TX_BUFSIZE 1024
 
 struct packet_header {

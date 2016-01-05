@@ -2,9 +2,11 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <unistd.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include "packet.h"
 #include "common.h"
 
@@ -78,7 +80,7 @@ void process_ctr_msg(int confd) {
         exit(1);
     }
 
-    tv.tv_sec = 5;
+    tv.tv_sec = 60;
     tv.tv_usec = 0;
     if (setsockopt(confd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
         perror("Error");
@@ -91,12 +93,10 @@ void process_ctr_msg(int confd) {
 
         len = recv(confd, buf, RX_BUFSIZE, 0);
         if (len == -1) {
-#if 0
             if (errno == EAGAIN) {
                 close(confd);
                 break;
             }
-#endif
             continue;
         } else if (len == 0) {
             printf("Connection Closed\n");
@@ -113,8 +113,6 @@ void process_ctr_msg(int confd) {
                 if (send_ack(confd))
                     s = run_rx_test(confd, 1);
                 if (s != NULL) {
-                    send_summarystats(confd, s);
-                    send_summarystats(confd, s);
                     send_summarystats(confd, s);
                 } else {
                     printf("Error! will not send summary stats\n");
@@ -135,6 +133,7 @@ void process_ctr_msg(int confd) {
 void s_run(unsigned int port) {
     int fd;
     struct sockaddr_in my;
+    int flag = 1;
 
     fd = socket(PF_INET, SOCK_STREAM, 0);
     if (fd < 0) {
@@ -150,6 +149,13 @@ void s_run(unsigned int port) {
         return;
     }
 
+    int res = setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag,
+                         sizeof(int));
+    if (res < 0) {
+        printf("Cannot disable Nagle! Exit\n");
+        exit(1);
+    }
+
     if (listen(fd, BACKLOG) == -1) {
         perror("Cannot listen");
         return;
@@ -162,6 +168,13 @@ void s_run(unsigned int port) {
     if (confd == -1) {
         perror("cannot accept connection");
         return;
+    }
+
+    res = setsockopt(confd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag,
+                         sizeof(int));
+    if (res < 0) {
+        printf("Cannot disable Nagle! Exit\n");
+        exit(1);
     }
 
     process_ctr_msg(confd);

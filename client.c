@@ -3,9 +3,11 @@
 #include <string.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <unistd.h>
 #include <sys/socket.h>
 #include <netdb.h>
 #include <arpa/inet.h>
+#include <netinet/tcp.h>
 #include "packet.h"
 #include "common.h"
 
@@ -145,6 +147,7 @@ void c_run(char *hostname, char *port) {
     int status;
     char ipstr[INET_ADDRSTRLEN];
     int socketfd;
+    int flag;
 
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_INET;
@@ -175,6 +178,14 @@ void c_run(char *hostname, char *port) {
     if (socketfd < 0) {
         perror("Socket open failed: ");
     }
+
+    int ret = setsockopt(socketfd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag,
+                         sizeof(int));
+    if (ret < 0) {
+        printf("Cannot disable Nagle! Exit\n");
+        exit(1);
+    }
+
     if (connect(socketfd, p->ai_addr, p->ai_addrlen) == -1) {
         close(socketfd);
         perror("client: connect");
