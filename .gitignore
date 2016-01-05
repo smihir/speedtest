@@ -8,3 +8,6 @@ Debug/*
 .cproject
 .project
 .idea/*
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
