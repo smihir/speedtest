@@ -55,6 +55,7 @@ void send_summarystats(int confd, char *s) {
     hdr = (struct packet_header *)buffer;
     hdr->type = T_SUMMARYSTATS;
     hdr->data.stats.len = htonl((unsigned long)(strlen(s) + 1));
+    memcpy(&hdr->data.stats.msg[0], s, strlen(s) + 1);
 
     while (retries > 0) {
         int len;
@@ -64,8 +65,6 @@ void send_summarystats(int confd, char *s) {
             continue;
         }
         printf("Done...\n");
-        //free(hdr->data.stats.msg);
-        sleep(2);
         return;
     }
 }
@@ -74,6 +73,7 @@ void process_ctr_msg(int confd) {
     struct timeval tv;
     char *buf = malloc(RX_BUFSIZE);
     char *s = NULL;
+    int cum_len = 0;
 
     if (buf == NULL) {
         printf("Cannot allocate memory for Rx\n");
@@ -91,7 +91,7 @@ void process_ctr_msg(int confd) {
         int len;
         struct packet_header *hdr;
 
-        len = recv(confd, buf, RX_BUFSIZE, 0);
+        len = recv(confd, &buf[cum_len], RX_BUFSIZE - cum_len, 0);
         if (len == -1) {
             if (errno == EAGAIN) {
                 printf("Timed out waiting for commands from client\n");
@@ -105,6 +105,11 @@ void process_ctr_msg(int confd) {
             break;
         }
 
+        cum_len += len;
+        if (cum_len < RX_BUFSIZE)
+            continue;
+        cum_len = 0;
+
         hdr = (struct packet_header *)buf;
         
         printf("Received Control Message: %c\n", hdr->type);
@@ -115,6 +120,7 @@ void process_ctr_msg(int confd) {
                     s = run_rx_test(confd, 1);
                 if (s != NULL) {
                     send_summarystats(confd, s);
+                    free(s);
                 } else {
                     printf("Error! will not send summary stats\n");
                 }

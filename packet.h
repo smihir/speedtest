@@ -9,7 +9,7 @@ struct packet_header {
         union data {
             struct stats {
                 unsigned int len;
-                char *msg;
+                char msg[0];
             }__attribute__((__packed__)) stats;
         } data;
 }__attribute__((__packed__));

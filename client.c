@@ -19,27 +19,29 @@ void c_usage() {
 void receive_summarystats(int confd) {
     struct timeval tv;
     char *buf = malloc(RX_BUFSIZE);
-    int len, i;
+    int len , i, cum_len = 0;
     struct packet_header *hdr;
     unsigned int msglen;
     int retries = 5;
+    char *c;
 
     if (buf == NULL) {
         printf("Cannot allocate memory for Rx\n");
         exit(1);
     }
 
-    printf("Waiting for Summary Stats\n");
     tv.tv_sec = 15;
     tv.tv_usec = 0;
     if (setsockopt(confd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
-        perror("Error");
+        perror("Error setting Timeout for Summary Stats");
     }
 
+    printf("Waiting for Summary Stats\n");
+
     while (retries) {
-        len = recv(confd, buf, RX_BUFSIZE, 0);
+        len = recv(confd, &buf[cum_len], RX_BUFSIZE - cum_len, 0);
         if (len == -1) {
-            //nothing received for 5 sec, just break out...
+            //nothing received for 15 sec, just break out...
             if (errno == EAGAIN) {
                 perror("Timedout Receiving Summary Stats");
                 retries = 0;
@@ -53,6 +55,12 @@ void receive_summarystats(int confd) {
             close(confd);
             exit(1);
         }
+        cum_len += len;
+        if (cum_len < RX_BUFSIZE)
+            continue;
+        cum_len = 0;
+
+        break;
     }
 
     if (retries == 0)
@@ -64,17 +72,18 @@ void receive_summarystats(int confd) {
     switch (hdr->type) {
         case T_SUMMARYSTATS:
              msglen = ntohl(hdr->data.stats.len);
-             printf("%d %u\n", len, msglen);
+             c = &hdr->data.stats.msg[0];
+
             if (msglen > len - sizeof(struct packet_header)) {
                 printf("Summary Stats corrupted\n");
                 return;
             }
-
+            printf("\nUplink Summary Stats:");
+            printf("\n---------------------------------------------\n");
             for (i = 0; i < msglen; i++) {
-                printf("%d", i);
-                printf("%c\n", hdr->data.stats.msg[i]);
+                printf("%c", c[i]);
             }
-            printf("\n");
+            printf("----------------------------------------------\n");
             break;
     }
 
@@ -87,6 +96,7 @@ int send_ctrl_msg(int confd, int msgtype, char *data, int len) {
     struct packet_header *hdr;
     struct timeval tv;
     int retries = 5;
+    int cum_len = 0;
 
     tv.tv_sec = 5;
     tv.tv_usec = 0;
@@ -115,7 +125,7 @@ int send_ctrl_msg(int confd, int msgtype, char *data, int len) {
         printf("Send Control Message: %c\n", msgtype);
         send(confd, buffer, TX_BUFSIZE, 0);
 
-        len = recv(confd, buf, RX_BUFSIZE, 0);
+        len = recv(confd, &buf[cum_len], RX_BUFSIZE - cum_len, 0);
         if (len == -1) {
             perror("Error Receiving Packet");
             free(buf);
@@ -128,6 +138,11 @@ int send_ctrl_msg(int confd, int msgtype, char *data, int len) {
             free(buf);
             exit(1);
         }
+
+        cum_len += len;
+        if (cum_len < RX_BUFSIZE)
+            continue;
+        cum_len = 0;
 
         hdr = (struct packet_header *)buf;
         
@@ -194,7 +209,14 @@ void c_run(char *hostname, char *port) {
 
     if (send_ctrl_msg(socketfd, T_DOWNLOAD_TEST, NULL, 0)) {
         printf("Server is Ready for Download Test...\n");
-        run_rx_test(socketfd, 0);
+        char *s = run_rx_test(socketfd, 1);
+        if (s != NULL) {
+            printf("\nDownlink Summary Stats:\n");
+            printf("---------------------------------------------\n");
+            printf("%s", s);
+            printf("---------------------------------------------\n");
+            free(s);
+        }
     } else {
         printf("Internal Error! Will not run Download Test\n");
     }

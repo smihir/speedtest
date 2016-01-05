@@ -35,15 +35,12 @@ char *print_summarystats(struct timeval *tv_first, struct timeval *tv_end,
     elapsed_msec = elapsed_time(tv_first, tv_end);
     MBps = numbytes_rx / ((elapsed_msec / 1000) * BYTESTOMB);
 
-    printf("\n---------------------------------------------\n");
     if (s != NULL) {
         snprintf(s, MAX_PRINT_LEN, "packets received: %u \nbytes_received: %u \n"
                 "average packets per second: %f \naverage Mega Bytes per second: %f (%f Mbps)\n"
                 "duration (ms): %f \n",
                 numpkts_rx, numbytes_rx, numpkts_rx / (elapsed_msec / 1000),
                 MBps, MBps * 8, elapsed_msec);
-        printf("%s", s);
-
     } else {
         printf("packets received: %u \nbytes_received: %u \n"
                "average packets per second: %f \naverage Mega Bytes per second: %f (%f Mbps)\n"
@@ -51,7 +48,6 @@ char *print_summarystats(struct timeval *tv_first, struct timeval *tv_end,
                numpkts_rx, numbytes_rx, numpkts_rx / (elapsed_msec / 1000),
                MBps, MBps * 8, elapsed_msec);
     }
-    printf("---------------------------------------------\n");
     return s;
 }
 
@@ -59,6 +55,7 @@ char *run_rx_test(int confd, int retstr) {
     struct timeval tv, tv1, tv_first;
     unsigned int total_len = 0, num_pkts = 0;
     char *buf = malloc(RX_BUFSIZE);
+    int cum_len = 0;
 
     if (buf == NULL) {
         printf("Cannot allocate memory for Rx\n");
@@ -76,7 +73,7 @@ char *run_rx_test(int confd, int retstr) {
         int len;
         struct packet_header *hdr;
 
-        len = recv(confd, buf, RX_BUFSIZE, 0);
+        len = recv(confd, &buf[cum_len], RX_BUFSIZE - cum_len, 0);
         if (len == -1) {
             if (errno == EBADF) {
                 perror("Error Receiving Packet Closing socket!");
@@ -97,6 +94,12 @@ char *run_rx_test(int confd, int retstr) {
         if (num_pkts == 1) {
             tv_first = tv1;
         }
+
+        cum_len += len;
+        if (cum_len < RX_BUFSIZE)
+            continue;
+        cum_len = 0;
+
 
         hdr = (struct packet_header *)buf;
         
@@ -134,11 +137,12 @@ void run_tx_test(int confd) {
 
         if ((len = send(confd, buffer, TX_BUFSIZE, 0)) == -1) {
             if (errno == EBADF) {
+                perror("Error Sending Packet Closing socket!");
                 free(buffer);
                 close(confd);
                 return;
             }
-            perror("send");
+            perror("Error Sending Packet");
         }
         total_len += len;
     }
